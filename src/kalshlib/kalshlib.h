@@ -6,24 +6,27 @@ class ConnectionManager{
     std::string publicKey;
     EVP_PKEY* pkey;
     EVP_PKEY_CTX* ctx;
+    std::string baseUrl;
 
     ConnectionManager();
-
-    std::string getPubkey();
-
-    std::string getPrivatekey();
     
-    long long currentTimeMs();
+    std::string currentTimeMs();
+    
+    std::string generateMsg(std::string &time, std::string &method, std::string &path);
 
-    double getBalance(std::vector<std::string> auth);
+    std::string signMsg(std::string &msg, EVP_PKEY* pkey);
 
-    int placeOrder(std::vector<std::string> auth, std::string ticker, std::string action, std::string side, int maxCost, int numContracts); //cancel_order_on_pause = true
+    void doAuth(std::string method, std::string path, curl_slist *&list);
 
-    int cancelOrder(std::vector<std::string> auth, int orderId, int subAccount);
+    std::string getBalance();
 
-    int createWebsocket(std::vector<std::string> auth, std::string marketTicker);
+    std::string placeOrder(const char *ticker, int action, int side, int maxCost, int numContracts);
 
-    int keepWebsocketAlive(std::vector<std::string> auth);
+    long cancelOrder(std::string &orderId);
 
-    int getOrderbookData(std::vector<std::string> auth, std::string marketTicker);
+    int subscribeWebsocket();
+
+    int keepWebsocketAlive();
+
+    int getOrderbookData();
 };

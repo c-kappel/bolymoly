@@ -1,3 +1,6 @@
 src/kalshlib/config.txt
 
 .vscode/
+
+*.out
+*.o
