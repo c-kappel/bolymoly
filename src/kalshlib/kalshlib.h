@@ -22,11 +22,12 @@ class ConnectionManager{
 
     std::string placeOrder(const char *ticker, int action, int side, int maxCost, int numContracts);
 
-    long cancelOrder(std::string &orderId);
+    int cancelOrder(std::string &orderId);
 
-    int subscribeWebsocket();
+    int createWebsocket(CURL &curl);
+
+    int getOrderbookData(CURL &curl);
 
     int keepWebsocketAlive();
 
-    int getOrderbookData();
 };

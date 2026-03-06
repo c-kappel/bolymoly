@@ -186,7 +186,19 @@ std::string ConnectionManager::placeOrder(const char *ticker, int action, int si
         if(side == 1){ //yes
             snprintf(body, 512, "{\"ticker\": \"%s\",\"side\": \"yes\",\"action\": \"buy\",\"count\": %d,\"yes_price\": %d,\"cancel_order_on_pause\": true}",ticker,numContracts,price);
         }
+        if (side == 0){ // no
+            snprintf(body, 512, "{\"ticker\": \"%s\",\"side\": \"no\",\"action\": \"buy\",\"count\": %d,\"yes_price\": %d,\"cancel_order_on_pause\": true}",ticker,numContracts,price);
+        }
     }
+    else if(action == 0){ //sell
+        if (side == 1) {
+             snprintf(body, 512, "{\"ticker\": \"%s\",\"side\": \"yes\",\"action\": \"sell\",\"count\": %d,\"yes_price\": %d,\"cancel_order_on_pause\": true}",ticker,numContracts,price);
+        }
+        if (side == 0){
+             snprintf(body, 512, "{\"ticker\": \"%s\",\"side\": \"no\",\"action\": \"sell\",\"count\": %d,\"yes_price\": %d,\"cancel_order_on_pause\": true}",ticker,numContracts,price);
+        }
+    }
+
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(body));
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
     CURLcode mresult = curl_easy_perform(curl);
@@ -205,7 +217,7 @@ std::string ConnectionManager::placeOrder(const char *ticker, int action, int si
     return "";
 }
 
-long ConnectionManager::cancelOrder(std::string &orderId){
+int ConnectionManager::cancelOrder(std::string &orderId){
     std::string path = std::string("/trade-api/v2/portfolio/orders/") + orderId;
     std::string method = "DELETE";
     CURL* curl = curl_easy_init();
@@ -223,7 +235,7 @@ long ConnectionManager::cancelOrder(std::string &orderId){
     if(mresult){
         std::cout << "Error creating hhtp request";
     }
-    long httpCode = 0;
+    int httpCode = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
     free(response.data);
     curl_slist_free_all(list);
@@ -231,22 +243,47 @@ long ConnectionManager::cancelOrder(std::string &orderId){
     return httpCode;
 }
 
-int ConnectionManager::subscribeWebsocket(){
+int ConnectionManager::createWebsocket(CURL &curl){
     std::string method = "GET";
-    std::string path = "/";
+    std::string path = "/trade-api/ws/v2";
     curl_slist *list = NULL;
     doAuth(method, path, list);
 
-    CURL *curl = curl_easy_init();
-    curl_easy_setopt(curl, CURLOPT_URL, "wss://api.elections.kalshi.com/");
+    curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+    curl_easy_setopt(curl, CURLOPT_URL, "wss://api.elections.kalshi.com/trade-api/ws/v2");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
+    curl_easy_setopt(curl, CURLOPT_CONNECT_ONLY, 2L);
     CURLcode result = curl_easy_perform(curl);
     if (result) {
         std::cout << "Error creating the websocket connection: " << curl_easy_strerror(result) << std::endl;
+        return 0;
     }
+    return 1;
 }
 
+//todo : handle incoming data (writeback function?), keep alive
 
+int ConnectionManager::getTickerUpdates(CURL &curl){
+    CURLcode result = CURLE_OK;
+    char buffer[256];
+    size_t offset = 0;
+
+    while (!result){
+        size_t recv;
+        curl_ws_frame *meta;
+        result = curl_ws_recv(curl, buffer + offset, sizeof(buffer) - offset, &recv, &meta);
+        offset += recv;
+        if (result == CURLE_OK){
+            if (meta->bytesleft == 0){
+                return 1;
+            }
+            if (meta->bytesleft > sizeof(buffer) - offset){
+                result = CURLE_TOO_LARGE;
+            }
+        }
+    }
+    return 0;
+}
 
 int main(){
     //MARKET FORMAT: "KXSOL15M-26FEB251815-15"
