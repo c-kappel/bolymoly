@@ -4,7 +4,6 @@
 #include <chrono>
 #include <openssl/pem.h>
 #include <openssl/evp.h>
-#include <curl/curl.h>
 #include "kalshlib.h"
 
 ConnectionManager::ConnectionManager(){
@@ -243,7 +242,7 @@ int ConnectionManager::cancelOrder(std::string &orderId){
     return httpCode;
 }
 
-int ConnectionManager::createWebsocket(CURL &curl){
+int ConnectionManager::createWebsocket(CURL *curl){
     std::string method = "GET";
     std::string path = "/trade-api/ws/v2";
     curl_slist *list = NULL;
@@ -263,23 +262,42 @@ int ConnectionManager::createWebsocket(CURL &curl){
 
 //todo : handle incoming data (writeback function?), keep alive
 
-int ConnectionManager::getTickerUpdates(CURL &curl){
-    CURLcode result = CURLE_OK;
-    char buffer[256];
-    size_t offset = 0;
+int ConnectionManager::getTickerUpdates(CURL *curl, const char *ticker, char *data, size_t data_size){
+    CURLcode send_msg = CURLE_OK;
+    size_t s_offset = 0;
+    char s_buffer[256];
+    snprintf(s_buffer, 256, "{\"id\": 1, \"cmd\": \"subscribe\", \"params\": {\"channels\": [\"ticker\"], \"market_ticker\": \"%s\"}}", ticker);
 
-    while (!result){
+    while (!send_msg){
+        size_t sent;
+        send_msg = curl_ws_send(curl, s_buffer + s_offset, strlen(s_buffer) - s_offset, &sent, 0, CURLWS_TEXT);
+        s_offset += sent;
+        if(send_msg == CURLE_OK){
+            break;
+        }
+        send_msg = CURLE_OK;
+    }
+
+    CURLcode recieve_msg = CURLE_OK;
+    size_t r_offset = 0;
+
+    while (!recieve_msg){
         size_t recv;
-        curl_ws_frame *meta;
-        result = curl_ws_recv(curl, buffer + offset, sizeof(buffer) - offset, &recv, &meta);
-        offset += recv;
-        if (result == CURLE_OK){
+        const struct curl_ws_frame *meta;
+        recieve_msg = curl_ws_recv(curl, data + r_offset, data_size - r_offset, &recv, &meta);
+        r_offset += recv;
+        if (recieve_msg == CURLE_AGAIN){
+            recieve_msg = CURLE_OK;
+            continue;
+        }
+        if (recieve_msg == CURLE_OK){
             if (meta->bytesleft == 0){
                 return 1;
             }
-            if (meta->bytesleft > sizeof(buffer) - offset){
-                result = CURLE_TOO_LARGE;
+            if (meta->bytesleft > data_size - r_offset){
+                recieve_msg = CURLE_TOO_LARGE;
             }
+            
         }
     }
     return 0;
@@ -288,7 +306,12 @@ int ConnectionManager::getTickerUpdates(CURL &curl){
 int main(){
     //MARKET FORMAT: "KXSOL15M-26FEB251815-15"
     ConnectionManager manager;
-    manager.subscribeWebsocket();
+    CURL* curl = curl_easy_init();
+    manager.createWebsocket(curl);
+    char data[512];
+    int result = manager.getTickerUpdates(curl, "KXSOL15M-26MAR052345-15", data, 512);
+    std:: cout << result << std::endl;
+    printf("%s\n", data);
     return 0;
 }
 

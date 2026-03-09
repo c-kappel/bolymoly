@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include <curl/curl.h>
 
 class ConnectionManager{
     public:
@@ -24,9 +25,9 @@ class ConnectionManager{
 
     int cancelOrder(std::string &orderId);
 
-    int createWebsocket(CURL &curl);
+    int createWebsocket(CURL *curl);
 
-    int getOrderbookData(CURL &curl);
+    int getTickerUpdates(CURL *curl, const char *buffer, char *data, size_t size_data);
 
     int keepWebsocketAlive();
 
