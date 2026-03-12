@@ -260,9 +260,7 @@ int ConnectionManager::createWebsocket(CURL *curl){
     return 1;
 }
 
-//todo : handle incoming data (writeback function?), keep alive
-
-int ConnectionManager::getTickerUpdates(CURL *curl, const char *ticker, char *data, size_t data_size){
+int ConnectionManager::subscribeTickerUpdates(CURL *curl, const char *ticker, char *data, size_t data_size){
     CURLcode send_msg = CURLE_OK;
     size_t s_offset = 0;
     char s_buffer[256];
@@ -278,29 +276,53 @@ int ConnectionManager::getTickerUpdates(CURL *curl, const char *ticker, char *da
         send_msg = CURLE_OK;
     }
 
-    CURLcode recieve_msg = CURLE_OK;
+    CURLcode receive_msg = CURLE_OK;
     size_t r_offset = 0;
 
-    while (!recieve_msg){
+    while (!receive_msg){
         size_t recv;
         const struct curl_ws_frame *meta;
-        recieve_msg = curl_ws_recv(curl, data + r_offset, data_size - r_offset, &recv, &meta);
+        receive_msg = curl_ws_recv(curl, data + r_offset, data_size - r_offset, &recv, &meta);
         r_offset += recv;
-        if (recieve_msg == CURLE_AGAIN){
-            recieve_msg = CURLE_OK;
+        if (receive_msg == CURLE_AGAIN){
+            receive_msg = CURLE_OK;
             continue;
         }
-        if (recieve_msg == CURLE_OK){
+        if (receive_msg == CURLE_OK){
             if (meta->bytesleft == 0){
                 return 1;
             }
             if (meta->bytesleft > data_size - r_offset){
-                recieve_msg = CURLE_TOO_LARGE;
+                receive_msg = CURLE_TOO_LARGE;
             }
             
         }
     }
     return 0;
+}
+
+int ConnectionManager::receiveWebsocketData(CURL* curl){
+    CURLcode receive_msg = CURLE_OK;
+    char data[512];
+    size_t data_size = 512;
+    while(1){
+        const struct curl_ws_frame *meta;
+        size_t r_offset = 0;
+        size_t recv;
+        receive_msg = curl_ws_recv(curl, r_offset + data, data_size - r_offset, &recv, &meta);
+        r_offset += recv;
+        if (receive_msg == CURLE_AGAIN){
+            std::cout << "No data yet :()" << std::endl;
+            continue;
+        }
+        if (meta->bytesleft > data_size - r_offset){
+            std::cout << "The buffer was too small to intake the incoming frame" << std::endl;
+            return -1; 
+        }
+        if (meta->bytesleft == 0){
+            printf("Current frame: %s\n", data);
+        }
+    }
 }
 
 int main(){
@@ -309,9 +331,9 @@ int main(){
     CURL* curl = curl_easy_init();
     manager.createWebsocket(curl);
     char data[512];
-    int result = manager.getTickerUpdates(curl, "KXSOL15M-26MAR052345-15", data, 512);
-    std:: cout << result << std::endl;
+    int result = manager.subscribeTickerUpdates(curl, "KXSOL15M-26MAR120145-15", data, 512);
     printf("%s\n", data);
+    manager.receiveWebsocketData(curl);
     return 0;
 }
 

@@ -27,8 +27,8 @@ class ConnectionManager{
 
     int createWebsocket(CURL *curl);
 
-    int getTickerUpdates(CURL *curl, const char *buffer, char *data, size_t size_data);
+    int subscribeTickerUpdates(CURL *curl, const char *buffer, char *data, size_t size_data);
 
-    int keepWebsocketAlive();
+    int receiveWebsocketData(CURL *curl);
 
 };
