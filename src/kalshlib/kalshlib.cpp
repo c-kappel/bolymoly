@@ -303,23 +303,26 @@ int ConnectionManager::subscribeTickerUpdates(CURL *curl, const char *ticker, ch
 
 int ConnectionManager::receiveWebsocketData(CURL* curl){
     CURLcode receive_msg = CURLE_OK;
-    char data[512];
-    size_t data_size = 512;
+    size_t r_offset = 0;
+    char data[16192];
+    size_t data_size = 16192;
     while(1){
         const struct curl_ws_frame *meta;
-        size_t r_offset = 0;
         size_t recv;
         receive_msg = curl_ws_recv(curl, r_offset + data, data_size - r_offset, &recv, &meta);
         r_offset += recv;
         if (receive_msg == CURLE_AGAIN){
-            std::cout << "No data yet :()" << std::endl;
             continue;
+        }
+        if (receive_msg != 0){
+            std::cout << "Error msg: " << receive_msg << std::endl;
         }
         if (meta->bytesleft > data_size - r_offset){
             std::cout << "The buffer was too small to intake the incoming frame" << std::endl;
             return -1; 
         }
         if (meta->bytesleft == 0){
+            data[r_offset] = '\0';
             printf("Current frame: %s\n", data);
         }
     }
@@ -331,7 +334,7 @@ int main(){
     CURL* curl = curl_easy_init();
     manager.createWebsocket(curl);
     char data[512];
-    int result = manager.subscribeTickerUpdates(curl, "KXSOL15M-26MAR120145-15", data, 512);
+    int result = manager.subscribeTickerUpdates(curl, "KXSOL15M-26MAR121145-45", data, 512);
     printf("%s\n", data);
     manager.receiveWebsocketData(curl);
     return 0;

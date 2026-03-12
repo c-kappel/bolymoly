@@ -4,3 +4,4 @@ src/kalshlib/config.txt
 
 *.out
 *.o
+*.txt
