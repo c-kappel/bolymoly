@@ -5,6 +5,7 @@
 class ConnectionManager{
     public:
     int ws_sub_id;
+    char ticker[24];
     std::string publicKey;
     EVP_PKEY* pkey;
     EVP_PKEY_CTX* ctx;
@@ -26,7 +27,7 @@ class ConnectionManager{
 
     int cancelOrder(std::string &orderId);
 
-    int getMarketTimestamp(char *output);
+    int updateMarketTicker(char *ticker);
 
     int createWebsocket(CURL *curl);
 

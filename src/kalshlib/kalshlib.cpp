@@ -11,6 +11,7 @@
 ConnectionManager::ConnectionManager(){
     //Set public key and stage the private key
     ws_sub_id = 0;
+    updateMarketTicker(ticker);
     publicKey = "e86478f2-dd6c-4ae9-9190-064f670aad90";
     FILE* fp = fopen("src/kalshlib/config.txt", "r");
     pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
@@ -264,16 +265,35 @@ int ConnectionManager::createWebsocket(CURL *curl){
 }
 
 // Calculate the market timestamp: returns 0 on success
-int ConnectionManager::getMarketTimestamp(char *output){
+// Note need to manually update the month, which is very very bad!
+int ConnectionManager::updateMarketTicker(char *ticker){
     const auto now = std::chrono::system_clock::now();
     time_t t = std::chrono::system_clock::to_time_t(now);
     const auto local_time = std::localtime(&t);
-    if (local_time->tm_min == 0 || local_time->tm_min == 15 || local_time->tm_min == 30 || local_time->tm_min == 45){
-        snprintf(output, 10, "%d%d%d-%d", local_time->tm_mday, local_time->tm_hour, local_time->tm_min, local_time->tm_min);
+    if (local_time->tm_min >= 45){
+        if (local_time->tm_hour == 23){
+            snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday + 1, 00, 00, 00);
+        }
+        else{
+            snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday, local_time->tm_hour + 1, 00, 00);
+        }
+        return 0;
+    }
+    else if (local_time->tm_min >= 30){
+        snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday, local_time->tm_hour, 45, 45);
+        return 0;
+    }
+    else if (local_time->tm_min >= 15){
+         snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday, local_time->tm_hour, 30, 30);
+         return 0;
+    }
+    else if (local_time->tm_min >= 00){
+        snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday, local_time->tm_hour, 15, 15);
         return 0;
     }
     return -1;
 }
+
 
 // Unsubscribes from a channel: returns 0 on success
 int ConnectionManager::unsubscribeChannel(CURL *curl, int channel_id){
@@ -371,20 +391,21 @@ int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
 
 int main(){
     ConnectionManager manager;
-    CURL* curl = curl_easy_init();
-    manager.createWebsocket(curl);
-    char data[512];
-    int result = manager.subscribeOrderbookUpdates(curl, "KXSOL15M-26MAR122330-30", data, 512);
+    std::cout << manager.ticker;
+    // CURL* curl = curl_easy_init();
+    // manager.createWebsocket(curl);
+    // char data[512];
+    // int result = manager.subscribeOrderbookUpdates(curl, "KXSOL15M-26MAR122330-30", data, 512);
    
-    curl_socket_t socketfd;
-    CURLcode get_fd = curl_easy_getinfo(curl, CURLINFO_ACTIVESOCKET, &socketfd);
-    struct pollfd socket;
-    socket.fd = socketfd;
-    socket.events = POLLIN;
-    socket.revents = 0;
-    printf("%s\n", data);
-    manager.receiveWebsocketData(curl, &socket);
-    curl_easy_cleanup(curl);
+    // curl_socket_t socketfd;
+    // CURLcode get_fd = curl_easy_getinfo(curl, CURLINFO_ACTIVESOCKET, &socketfd);
+    // struct pollfd socket;
+    // socket.fd = socketfd;
+    // socket.events = POLLIN;
+    // socket.revents = 0;
+    // printf("%s\n", data);
+    // manager.receiveWebsocketData(curl, &socket);
+    // curl_easy_cleanup(curl);
     return 0;
 }
 
