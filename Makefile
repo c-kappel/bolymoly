@@ -1,5 +1,5 @@
 CPPC = clang++
-CFLAGS = -std=c++17 -fsanitize=address
+CFLAGS = -std=c++20 -fsanitize=address
 OPENSSL_CF = -I/opt/homebrew/opt/openssl@3.6/include/
 OPENSSL_LF = -L/opt/homebrew/opt/openssl@3.6/lib/ -lcrypto
 CURL_CF = -I/usr/local/include/

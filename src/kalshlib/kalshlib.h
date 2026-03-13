@@ -4,6 +4,7 @@
 
 class ConnectionManager{
     public:
+    int ws_sub_id;
     std::string publicKey;
     EVP_PKEY* pkey;
     EVP_PKEY_CTX* ctx;
@@ -25,10 +26,14 @@ class ConnectionManager{
 
     int cancelOrder(std::string &orderId);
 
+    int getMarketTimestamp(char *output);
+
     int createWebsocket(CURL *curl);
 
-    int subscribeTickerUpdates(CURL *curl, const char *buffer, char *data, size_t size_data);
+    int subscribeOrderbookUpdates(CURL *curl, const char *buffer, char *data, size_t size_data);
 
-    int receiveWebsocketData(CURL *curl);
+    int unsubscribeChannel(CURL *curl, int channel_id);
+
+    int receiveWebsocketData(CURL *curl, pollfd *socket);
 
 };

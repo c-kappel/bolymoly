@@ -2,12 +2,15 @@
 #include <cstdio>
 #include <cstring>
 #include <chrono>
+#include <ctime>
+#include <poll.h>
 #include <openssl/pem.h>
 #include <openssl/evp.h>
 #include "kalshlib.h"
 
 ConnectionManager::ConnectionManager(){
     //Set public key and stage the private key
+    ws_sub_id = 0;
     publicKey = "e86478f2-dd6c-4ae9-9190-064f670aad90";
     FILE* fp = fopen("src/kalshlib/config.txt", "r");
     pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
@@ -260,11 +263,44 @@ int ConnectionManager::createWebsocket(CURL *curl){
     return 1;
 }
 
-int ConnectionManager::subscribeTickerUpdates(CURL *curl, const char *ticker, char *data, size_t data_size){
+// Calculate the market timestamp: returns 0 on success
+int ConnectionManager::getMarketTimestamp(char *output){
+    const auto now = std::chrono::system_clock::now();
+    time_t t = std::chrono::system_clock::to_time_t(now);
+    const auto local_time = std::localtime(&t);
+    if (local_time->tm_min == 0 || local_time->tm_min == 15 || local_time->tm_min == 30 || local_time->tm_min == 45){
+        snprintf(output, 10, "%d%d%d-%d", local_time->tm_mday, local_time->tm_hour, local_time->tm_min, local_time->tm_min);
+        return 0;
+    }
+    return -1;
+}
+
+// Unsubscribes from a channel: returns 0 on success
+int ConnectionManager::unsubscribeChannel(CURL *curl, int channel_id){
+    this->ws_sub_id++;
+    CURLcode send_msg = CURLE_OK;
+
+    size_t s_offset = 0;
+    char s_buffer[128];
+    snprintf(s_buffer, 128, "{\"id\": %d, \"cmd\": \"unsubscribe\", \"params\": {\"sids\": [\"%d\"]}}", this->ws_sub_id, channel_id);
+    while (!send_msg){
+        size_t sent;
+        send_msg = curl_ws_send(curl, s_buffer + s_offset, strlen(s_buffer) - s_offset, &sent, 0, CURLWS_TEXT);
+        s_offset += sent;
+        if(send_msg == CURLE_OK){
+            return 0;
+        }
+        send_msg = CURLE_OK;
+    }
+    return -1;
+}
+
+int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, const char *ticker, char *data, size_t data_size){
+    this->ws_sub_id++;
     CURLcode send_msg = CURLE_OK;
     size_t s_offset = 0;
     char s_buffer[256];
-    snprintf(s_buffer, 256, "{\"id\": 1, \"cmd\": \"subscribe\", \"params\": {\"channels\": [\"ticker\"], \"market_ticker\": \"%s\"}}", ticker);
+    snprintf(s_buffer, 256, "{\"id\": %d, \"cmd\": \"subscribe\", \"params\": {\"channels\": [\"orderbook_delta\"], \"market_ticker\": \"%s\"}}", this->ws_sub_id, ticker);
 
     while (!send_msg){
         size_t sent;
@@ -290,7 +326,7 @@ int ConnectionManager::subscribeTickerUpdates(CURL *curl, const char *ticker, ch
         }
         if (receive_msg == CURLE_OK){
             if (meta->bytesleft == 0){
-                return 1;
+                return this->ws_sub_id;
             }
             if (meta->bytesleft > data_size - r_offset){
                 receive_msg = CURLE_TOO_LARGE;
@@ -298,10 +334,10 @@ int ConnectionManager::subscribeTickerUpdates(CURL *curl, const char *ticker, ch
             
         }
     }
-    return 0;
+    return -1;
 }
 
-int ConnectionManager::receiveWebsocketData(CURL* curl){
+int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
     CURLcode receive_msg = CURLE_OK;
     size_t r_offset = 0;
     char data[16192];
@@ -312,6 +348,11 @@ int ConnectionManager::receiveWebsocketData(CURL* curl){
         receive_msg = curl_ws_recv(curl, r_offset + data, data_size - r_offset, &recv, &meta);
         r_offset += recv;
         if (receive_msg == CURLE_AGAIN){
+            int wait = poll(socket, 1, 10000);
+            if (wait == 0){
+                std::cout << "Dead socket!" << std::endl;
+                return -2;
+            }
             continue;
         }
         if (receive_msg != 0){
@@ -322,21 +363,28 @@ int ConnectionManager::receiveWebsocketData(CURL* curl){
             return -1; 
         }
         if (meta->bytesleft == 0){
-            data[r_offset] = '\0';
+            r_offset = 0;
             printf("Current frame: %s\n", data);
         }
     }
 }
 
 int main(){
-    //MARKET FORMAT: "KXSOL15M-26FEB251815-15"
     ConnectionManager manager;
     CURL* curl = curl_easy_init();
     manager.createWebsocket(curl);
     char data[512];
-    int result = manager.subscribeTickerUpdates(curl, "KXSOL15M-26MAR121145-45", data, 512);
+    int result = manager.subscribeOrderbookUpdates(curl, "KXSOL15M-26MAR122330-30", data, 512);
+   
+    curl_socket_t socketfd;
+    CURLcode get_fd = curl_easy_getinfo(curl, CURLINFO_ACTIVESOCKET, &socketfd);
+    struct pollfd socket;
+    socket.fd = socketfd;
+    socket.events = POLLIN;
+    socket.revents = 0;
     printf("%s\n", data);
-    manager.receiveWebsocketData(curl);
+    manager.receiveWebsocketData(curl, &socket);
+    curl_easy_cleanup(curl);
     return 0;
 }
 
