@@ -86,39 +86,36 @@ static size_t write_callback(char *payload, size_t size, size_t nmemb, void *use
     response->data[response->size] = '\0';
     return realSize;
 }
-std::vector<char*> parseJSON(char *input, const char* keys[], size_t keyLengths[], size_t numKeys){
-    std::vector<char*> parsed;
-    for(size_t i = 0; i < numKeys; i++){
-        char* value = strstr(input, keys[i]);
-        if(!value){
-            std::cout << "Errr finding the key: " << keys[i];
-            return parsed;
-        }
-        value += keyLengths[i] + 2;
-        char* cutOff = strchr(value, ',');
-        if(!cutOff){
-            std::cout << "Errr finding the key cutoff for key: " << keys[i];
-            return parsed;
-        }
-        char* buff = (char *)malloc(64);
-        int pos = 0;
-        while(value != cutOff){
-            buff[pos] = *value;
-            value++;
-            pos++;
-        }
-        if(buff[0] == '\"'){
-            buff++;
-            buff[pos-1] = '\0';
 
-        }
-        else{
-            buff[pos] = '\0';
-        } 
-        parsed.push_back(buff);
+
+void parseJSON(char *input, const char* key, char delim, char *c_out, int *d_out){
+    char *start = strstr(input, key);
+    if (!start) {
+        std::cout << "Error in parsing the JSON, possible bad request?" << std::endl;
+        return;
+    }
+    start += strlen(key) + 2; // moves past ": at the end of the key
+    char *end = strchr(start, delim);
+    if (!end) {
+        std::cout << "Error in parsing the JSON, possible bad request?" << std::endl;
+        return;
     }
 
-    return parsed;
+    if (d_out == nullptr){
+        size_t len = end - start;
+        memcpy(c_out, start, len);
+        c_out += len - 1;
+        *c_out = '\0';
+    } 
+    else {
+        char *decimal = strchr(start, '.');
+        if (decimal != nullptr){
+            std::from_chars(decimal + 1, end, *d_out);
+        }
+        else {
+            std::from_chars(start, end, *d_out);
+        }
+    }
 }
 
 void ConnectionManager::doAuth(std::string method, std::string path, curl_slist *&list){
@@ -136,7 +133,7 @@ void ConnectionManager::doAuth(std::string method, std::string path, curl_slist 
     list = curl_slist_append(list, h3.c_str());
 }
 
-std::string ConnectionManager::getBalance(){
+int ConnectionManager::getBalance(){
     std::string method = "GET";
     std::string path = "/trade-api/v2/portfolio/balance";
     CURL* curl = curl_easy_init();
@@ -154,22 +151,17 @@ std::string ConnectionManager::getBalance(){
     if(mresult){
         std::cout << "Error creating hhtp request";
     }
-    const char *keys[] = {"balance"};
-    size_t keySizes[] = {7};
-    std::vector<char *> parsed = parseJSON(response.data, keys, keySizes, (size_t)1);
+    const char* key = "balance";
+    int balance = 0;
+    char delim = ',';
+    parseJSON(response.data, key, delim, nullptr, &balance);
     curl_slist_free_all(list);
     curl_easy_cleanup(curl);
     free(response.data);
-      if(parsed.size() > 0){
-        std::string balance = parsed[0];
-        free(parsed[0]);
-        return balance;
-    }
-    std:: cout<<"error parsing the balance.";
-    return "";
+    return balance;
 }
 
-std::string ConnectionManager::placeOrder(const char *ticker, int action, int side, int price, int numContracts){
+std::string ConnectionManager::placeOrder(int action, int side, int price, int numContracts){
     std::string method = "POST";
     std::string path = "/trade-api/v2/portfolio/orders";
     CURL* curl = curl_easy_init();
@@ -185,6 +177,7 @@ std::string ConnectionManager::placeOrder(const char *ticker, int action, int si
     response.size = 0;
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&response);
     char body[512];
+    int order_id = 0;
     if(action == 1){ //buy
         if(side == 1){ //yes
             snprintf(body, 512, "{\"ticker\": \"%s\",\"side\": \"yes\",\"action\": \"buy\",\"count\": %d,\"yes_price\": %d,\"cancel_order_on_pause\": true}",ticker,numContracts,price);
@@ -206,18 +199,23 @@ std::string ConnectionManager::placeOrder(const char *ticker, int action, int si
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
     CURLcode mresult = curl_easy_perform(curl);
     if(mresult){
-        std::cout << "Error creating hhtp request";
+        std::cout << "Error creating in http request to place an order";
     }
-    const char *keys[] = {"order_id"};
-    size_t sizes[] = {8};
-    std::vector<char *> results = parseJSON(response.data, keys, sizes, (size_t)1);
+    int httpCode = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    if (httpCode != 201){
+        std::cout << "Order did not go through:" << std::endl;
+        std::cout << response.data << std::endl;
+        return "";
+    }
+    const char *key = "\"order_id\"";
+    char delim = ',';
+    char out[1024];
+    parseJSON(response.data, key, delim, out, nullptr);
     curl_slist_free_all(list);
     curl_easy_cleanup(curl);
     free(response.data);
-    std::string orderId = results[0];
-    free(results[0]);
-    return orderId;
-    return "";
+    return std::string(out);
 }
 
 int ConnectionManager::cancelOrder(std::string &orderId){
@@ -240,6 +238,10 @@ int ConnectionManager::cancelOrder(std::string &orderId){
     }
     int httpCode = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+    if (httpCode != 200){
+        std::cout << "Error canceling the order: " << std::endl;
+        std::cout <<response.data << std::endl;
+    }
     free(response.data);
     curl_slist_free_all(list);
     curl_easy_cleanup(curl);
@@ -270,30 +272,41 @@ int ConnectionManager::updateMarketTicker(char *ticker){
     const auto now = std::chrono::system_clock::now();
     time_t t = std::chrono::system_clock::to_time_t(now);
     const auto local_time = std::localtime(&t);
+    char t_hour[3];
+    //so fucking ugly holy
+    if (local_time->tm_hour < 10) {
+        if (local_time->tm_mday >= 45){
+            if (local_time->tm_hour == 9){
+                snprintf(t_hour, 3, "%d", local_time->tm_hour+1);
+            }
+            else snprintf(t_hour, 3, "0%d", local_time->tm_hour + 1);
+        }
+        else snprintf(t_hour, 3, "0%d", local_time->tm_hour);
+    }
+    else snprintf(t_hour, 3, "%d", local_time->tm_hour);
     if (local_time->tm_min >= 45){
         if (local_time->tm_hour == 23){
             snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday + 1, 00, 00, 00);
         }
         else{
-            snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday, local_time->tm_hour + 1, 00, 00);
+            snprintf(ticker, 24, "KXSOL15M-26MAR%d%s%d-%d", local_time->tm_mday, t_hour, 00, 00);
         }
         return 0;
     }
     else if (local_time->tm_min >= 30){
-        snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday, local_time->tm_hour, 45, 45);
+        snprintf(ticker, 24, "KXSOL15M-26MAR%d%s%d-%d", local_time->tm_mday, t_hour, 45, 45);
         return 0;
     }
     else if (local_time->tm_min >= 15){
-         snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday, local_time->tm_hour, 30, 30);
+         snprintf(ticker, 24, "KXSOL15M-26MAR%d%s%d-%d", local_time->tm_mday, t_hour, 30, 30);
          return 0;
     }
     else if (local_time->tm_min >= 00){
-        snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday, local_time->tm_hour, 15, 15);
+        snprintf(ticker, 24, "KXSOL15M-26MAR%d%s%d-%d", local_time->tm_mday, t_hour, 15, 15);
         return 0;
     }
     return -1;
 }
-
 
 // Unsubscribes from a channel: returns 0 on success
 int ConnectionManager::unsubscribeChannel(CURL *curl, int channel_id){
@@ -315,7 +328,7 @@ int ConnectionManager::unsubscribeChannel(CURL *curl, int channel_id){
     return -1;
 }
 
-int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, const char *ticker, char *data, size_t data_size){
+int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, char *data, size_t data_size){
     this->ws_sub_id++;
     CURLcode send_msg = CURLE_OK;
     size_t s_offset = 0;
@@ -384,28 +397,36 @@ int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
         }
         if (meta->bytesleft == 0){
             r_offset = 0;
-            printf("Current frame: %s\n", data);
+            //printf("Current frame: %s\n", data);
         }
     }
 }
 
 int main(){
     ConnectionManager manager;
-    std::cout << manager.ticker;
-    // CURL* curl = curl_easy_init();
-    // manager.createWebsocket(curl);
-    // char data[512];
-    // int result = manager.subscribeOrderbookUpdates(curl, "KXSOL15M-26MAR122330-30", data, 512);
+
+    CURL* curl = curl_easy_init();
+    manager.createWebsocket(curl);
+    char data[512];
+    int result = manager.subscribeOrderbookUpdates(curl, data, 512);
    
-    // curl_socket_t socketfd;
-    // CURLcode get_fd = curl_easy_getinfo(curl, CURLINFO_ACTIVESOCKET, &socketfd);
-    // struct pollfd socket;
-    // socket.fd = socketfd;
-    // socket.events = POLLIN;
-    // socket.revents = 0;
-    // printf("%s\n", data);
-    // manager.receiveWebsocketData(curl, &socket);
-    // curl_easy_cleanup(curl);
+    curl_socket_t socketfd;
+    CURLcode get_fd = curl_easy_getinfo(curl, CURLINFO_ACTIVESOCKET, &socketfd);
+    struct pollfd socket;
+    socket.fd = socketfd;
+    socket.events = POLLIN;
+    socket.revents = 0;
+    printf("%s\n", data);
+    //manager.receiveWebsocketData(curl, &socket);
+
+    int balance = manager.getBalance();
+    std::cout << "Current balance: " << balance << std::endl;
+    std::string order = manager.placeOrder(1, 1, 1, 1);
+    std::cout << "Order successful: " << order << std::endl;
+  
+    int code = manager.cancelOrder(order);
+    std::cout << "Cancel code : " << code << std::endl;
+    curl_easy_cleanup(curl);
     return 0;
 }
 

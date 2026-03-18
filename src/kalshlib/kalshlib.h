@@ -21,9 +21,9 @@ class ConnectionManager{
 
     void doAuth(std::string method, std::string path, curl_slist *&list);
 
-    std::string getBalance();
+    int getBalance();
 
-    std::string placeOrder(const char *ticker, int action, int side, int maxCost, int numContracts);
+    std::string placeOrder(int action, int side, int maxCost, int numContracts);
 
     int cancelOrder(std::string &orderId);
 
@@ -31,7 +31,7 @@ class ConnectionManager{
 
     int createWebsocket(CURL *curl);
 
-    int subscribeOrderbookUpdates(CURL *curl, const char *buffer, char *data, size_t size_data);
+    int subscribeOrderbookUpdates(CURL *curl, char *data, size_t size_data);
 
     int unsubscribeChannel(CURL *curl, int channel_id);
 
