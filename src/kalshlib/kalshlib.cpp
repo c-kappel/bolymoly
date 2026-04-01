@@ -283,13 +283,13 @@ int ConnectionManager::updateMarketTicker(char *ticker){
         }
         else snprintf(t_hour, 3, "0%d", local_time->tm_hour);
     }
-    else snprintf(t_hour, 3, "%d", local_time->tm_hour);
+    else snprintf(t_hour, 3, "0%d", local_time->tm_hour);
     if (local_time->tm_min >= 45){
         if (local_time->tm_hour == 23){
-            snprintf(ticker, 24, "KXSOL15M-26MAR%d%d%d-%d", local_time->tm_mday + 1, 00, 00, 00);
+            snprintf(ticker, 24, "KXSOL15M-26MAR%d0%d0%d-0%d", local_time->tm_mday + 1, 0, 0, 0);
         }
-        else{
-            snprintf(ticker, 24, "KXSOL15M-26MAR%d%s%d-%d", local_time->tm_mday, t_hour, 00, 00);
+        else{                    
+            snprintf(ticker, 24, "KXSOL15M-26MAR%d%s0%d-0%d", local_time->tm_mday, t_hour, 0, 0);
         }
         return 0;
     }
@@ -373,8 +373,10 @@ int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, char *data, size_t 
 int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
     CURLcode receive_msg = CURLE_OK;
     size_t r_offset = 0;
-    char data[16192];
-    size_t data_size = 16192;
+    char *data = (char*)malloc(1619200);
+    size_t data_size = 1619200;
+    memset((void*)data, 0, data_size);
+
     while(1){
         const struct curl_ws_frame *meta;
         size_t recv;
@@ -382,7 +384,7 @@ int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
         r_offset += recv;
         if (receive_msg == CURLE_AGAIN){
             int wait = poll(socket, 1, 10000);
-            if (wait == 0){
+            if (wait == 0){ //no data for more 10s
                 std::cout << "Dead socket!" << std::endl;
                 return -2;
             }
@@ -397,9 +399,10 @@ int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
         }
         if (meta->bytesleft == 0){
             r_offset = 0;
-            //printf("Current frame: %s\n", data);
+            printf("Current frame: %s\n", data);
         }
     }
+    free(data);
 }
 
 int main(){
@@ -417,7 +420,7 @@ int main(){
     socket.events = POLLIN;
     socket.revents = 0;
     printf("%s\n", data);
-    //manager.receiveWebsocketData(curl, &socket);
+    manager.receiveWebsocketData(curl, &socket);
 
     int balance = manager.getBalance();
     std::cout << "Current balance: " << balance << std::endl;
