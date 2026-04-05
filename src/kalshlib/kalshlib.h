@@ -27,7 +27,7 @@ class ConnectionManager{
 
     int cancelOrder(std::string &orderId);
 
-    int updateMarketTicker(char *ticker);
+    void updateMarketTicker(char *ticker, std::string& market);
 
     int createWebsocket(CURL *curl);
 

@@ -11,7 +11,8 @@
 ConnectionManager::ConnectionManager(){
     //Set public key and stage the private key
     ws_sub_id = 0;
-    updateMarketTicker(ticker);
+    std::string market = "KXSOL15M";
+    updateMarketTicker(ticker, market);
     publicKey = "e86478f2-dd6c-4ae9-9190-064f670aad90";
     FILE* fp = fopen("src/kalshlib/config.txt", "r");
     pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
@@ -266,46 +267,77 @@ int ConnectionManager::createWebsocket(CURL *curl){
     return 1;
 }
 
-// Calculate the market timestamp: returns 0 on success
-// Note need to manually update the month, which is very very bad!
-int ConnectionManager::updateMarketTicker(char *ticker){
+//Calculate the market timestamp and set it to ticker
+void ConnectionManager::updateMarketTicker(char *ticker, std::string& market){
     const auto now = std::chrono::system_clock::now();
     time_t t = std::chrono::system_clock::to_time_t(now);
     const auto local_time = std::localtime(&t);
-    char t_hour[3];
-    //so fucking ugly holy
-    if (local_time->tm_hour < 10) {
-        if (local_time->tm_mday >= 45){
-            if (local_time->tm_hour == 9){
-                snprintf(t_hour, 3, "%d", local_time->tm_hour+1);
-            }
-            else snprintf(t_hour, 3, "0%d", local_time->tm_hour + 1);
-        }
-        else snprintf(t_hour, 3, "0%d", local_time->tm_hour);
+
+    int year = local_time->tm_year - 100;
+    int month = local_time->tm_mon;
+    int day = local_time->tm_mday;
+    int hour = local_time->tm_hour;
+    int min = local_time->tm_min;
+    
+    std::vector<std::string> months = {
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+    };
+    
+    int min_f = 0;
+    if (min >= 45) {
+        min_f = 0;
     }
-    else snprintf(t_hour, 3, "0%d", local_time->tm_hour);
-    if (local_time->tm_min >= 45){
-        if (local_time->tm_hour == 23){
-            snprintf(ticker, 24, "KXSOL15M-26MAR%d0%d0%d-0%d", local_time->tm_mday + 1, 0, 0, 0);
-        }
-        else{                    
-            snprintf(ticker, 24, "KXSOL15M-26MAR%d%s0%d-0%d", local_time->tm_mday, t_hour, 0, 0);
-        }
-        return 0;
+    else if (min >= 30){
+        min_f = 45;
     }
-    else if (local_time->tm_min >= 30){
-        snprintf(ticker, 24, "KXSOL15M-26MAR%d%s%d-%d", local_time->tm_mday, t_hour, 45, 45);
-        return 0;
+    else if (min >= 15){
+        min_f = 30;
     }
-    else if (local_time->tm_min >= 15){
-         snprintf(ticker, 24, "KXSOL15M-26MAR%d%s%d-%d", local_time->tm_mday, t_hour, 30, 30);
-         return 0;
+    else if (min >= 00){
+        min_f = 15;
     }
-    else if (local_time->tm_min >= 00){
-        snprintf(ticker, 24, "KXSOL15M-26MAR%d%s%d-%d", local_time->tm_mday, t_hour, 15, 15);
-        return 0;
+
+    if (min_f == 0){
+        hour++;
     }
-    return -1;
+
+    if (hour == 0){
+        day++;
+    }
+
+    if (day == 0){
+        month++;
+    }
+
+    if (month == 12){
+        month = 0;
+        year++;
+    }
+    std::string s_month = months[month];
+    char s_day[3];
+    if (day <= 9){
+        snprintf(s_day, 3, "0%d", day);
+    } 
+    else {
+        snprintf(s_day, 3, "%d", day);
+    }
+    char s_hour[3];
+    if (hour <= 9){
+        snprintf(s_hour, 3, "0%d", hour);
+    }
+    else{
+        snprintf(s_hour, 3, "%d", hour);
+    }
+    char s_min[3];
+    if (min_f == 0){
+        snprintf(s_min, 3, "0%d", min_f);
+    }
+    else {
+        snprintf(s_min, 3, "%d", min_f);
+    }
+    
+    snprintf(ticker, 24, "%s-%d%s%s%s%s-%s", market.c_str(), year, s_month.c_str(), s_day, s_hour, s_min, s_min);
 }
 
 // Unsubscribes from a channel: returns 0 on success
@@ -422,13 +454,6 @@ int main(){
     printf("%s\n", data);
     manager.receiveWebsocketData(curl, &socket);
 
-    int balance = manager.getBalance();
-    std::cout << "Current balance: " << balance << std::endl;
-    std::string order = manager.placeOrder(1, 1, 1, 1);
-    std::cout << "Order successful: " << order << std::endl;
-  
-    int code = manager.cancelOrder(order);
-    std::cout << "Cancel code : " << code << std::endl;
     curl_easy_cleanup(curl);
     return 0;
 }
