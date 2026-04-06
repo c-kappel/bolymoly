@@ -405,15 +405,15 @@ int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, char *data, size_t 
 int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
     CURLcode receive_msg = CURLE_OK;
     size_t r_offset = 0;
-    char *data = (char*)malloc(1619200);
-    size_t data_size = 1619200;
+    char *data = (char*)malloc(4096);
+    size_t data_size = 4096;
     memset((void*)data, 0, data_size);
 
     while(1){
         const struct curl_ws_frame *meta;
-        size_t recv;
+        size_t recv = 0;
         receive_msg = curl_ws_recv(curl, r_offset + data, data_size - r_offset, &recv, &meta);
-        r_offset += recv;
+       
         if (receive_msg == CURLE_AGAIN){
             int wait = poll(socket, 1, 10000);
             if (wait == 0){ //no data for more 10s
@@ -422,16 +422,20 @@ int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
             }
             continue;
         }
+        r_offset += recv;
         if (receive_msg != 0){
             std::cout << "Error msg: " << receive_msg << std::endl;
+            return -1;
         }
         if (meta->bytesleft > data_size - r_offset){
             std::cout << "The buffer was too small to intake the incoming frame" << std::endl;
             return -1; 
         }
         if (meta->bytesleft == 0){
+            data[r_offset] = '\0';
             r_offset = 0;
             printf("Current frame: %s\n", data);
+            memset((void*)data, 0, data_size);
         }
     }
     free(data);
