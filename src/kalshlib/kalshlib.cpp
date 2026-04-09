@@ -18,6 +18,7 @@ ConnectionManager::ConnectionManager(){
     pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
     ctx =  EVP_PKEY_CTX_new(pkey, NULL);
     baseUrl = "https://api.elections.kalshi.com";//"https://demo-api.kalshi.co";
+    orderbookMsg = (char*)malloc(4096);
 }
 
 std::string ConnectionManager::currentTimeMs(){
@@ -405,14 +406,12 @@ int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, char *data, size_t 
 int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
     CURLcode receive_msg = CURLE_OK;
     size_t r_offset = 0;
-    char *data = (char*)malloc(4096);
     size_t data_size = 4096;
-    memset((void*)data, 0, data_size);
 
     while(1){
         const struct curl_ws_frame *meta;
         size_t recv = 0;
-        receive_msg = curl_ws_recv(curl, r_offset + data, data_size - r_offset, &recv, &meta);
+        receive_msg = curl_ws_recv(curl, r_offset + orderbookMsg, data_size - r_offset, &recv, &meta);
        
         if (receive_msg == CURLE_AGAIN){
             int wait = poll(socket, 1, 10000);
@@ -432,13 +431,12 @@ int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
             return -1; 
         }
         if (meta->bytesleft == 0){
-            data[r_offset] = '\0';
+            orderbookMsg[r_offset] = '\0';
             r_offset = 0;
-            printf("Current frame: %s\n", data);
-            memset((void*)data, 0, data_size);
+            printf("Current frame: %s\n", orderbookMsg);
+            memset((void*)orderbookMsg, 0, data_size);
         }
     }
-    free(data);
 }
 
 int main(){
@@ -455,7 +453,6 @@ int main(){
     socket.fd = socketfd;
     socket.events = POLLIN;
     socket.revents = 0;
-    printf("%s\n", data);
     manager.receiveWebsocketData(curl, &socket);
 
     curl_easy_cleanup(curl);

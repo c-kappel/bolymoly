@@ -1,4 +1,0 @@
-struct BitcoinFiveMin{
-    double PriceToBeat;
-    
-};

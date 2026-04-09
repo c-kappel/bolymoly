@@ -3,14 +3,15 @@
 #include <curl/curl.h>
 
 class ConnectionManager{
+    private:
+        int ws_sub_id;
+        char ticker[24];
+        std::string publicKey;
+        EVP_PKEY* pkey;
+        EVP_PKEY_CTX* ctx;
+        std::string baseUrl;
+        char *orderbookMsg;
     public:
-    int ws_sub_id;
-    char ticker[24];
-    std::string publicKey;
-    EVP_PKEY* pkey;
-    EVP_PKEY_CTX* ctx;
-    std::string baseUrl;
-
     ConnectionManager();
     
     std::string currentTimeMs();
