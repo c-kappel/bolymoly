@@ -303,8 +303,9 @@ void ConnectionManager::updateMarketTicker(char *ticker, std::string& market){
         hour++;
     }
 
-    if (hour == 0){
+    if (hour == 24){
         day++;
+        hour = 0;
     }
 
     if (day == 0){
@@ -327,7 +328,7 @@ void ConnectionManager::updateMarketTicker(char *ticker, std::string& market){
     if (hour <= 9){
         snprintf(s_hour, 3, "0%d", hour);
     }
-    else{
+    else {
         snprintf(s_hour, 3, "%d", hour);
     }
     char s_min[3];

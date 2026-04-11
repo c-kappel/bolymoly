@@ -12,30 +12,30 @@ class ConnectionManager{
         std::string baseUrl;
         char *orderbookMsg;
     public:
-    ConnectionManager();
-    
-    std::string currentTimeMs();
-    
-    std::string generateMsg(std::string &time, std::string &method, std::string &path);
+        ConnectionManager();
+        
+        std::string currentTimeMs();
+        
+        std::string generateMsg(std::string &time, std::string &method, std::string &path);
 
-    std::string signMsg(std::string &msg, EVP_PKEY* pkey);
+        std::string signMsg(std::string &msg, EVP_PKEY* pkey);
 
-    void doAuth(std::string method, std::string path, curl_slist *&list);
+        void doAuth(std::string method, std::string path, curl_slist *&list);
 
-    int getBalance();
+        int getBalance();
 
-    std::string placeOrder(int action, int side, int maxCost, int numContracts);
+        std::string placeOrder(int action, int side, int maxCost, int numContracts);
 
-    int cancelOrder(std::string &orderId);
+        int cancelOrder(std::string &orderId);
 
-    void updateMarketTicker(char *ticker, std::string& market);
+        void updateMarketTicker(char *ticker, std::string& market);
 
-    int createWebsocket(CURL *curl);
+        int createWebsocket(CURL *curl);
 
-    int subscribeOrderbookUpdates(CURL *curl, char *data, size_t size_data);
+        int subscribeOrderbookUpdates(CURL *curl, char *data, size_t size_data);
 
-    int unsubscribeChannel(CURL *curl, int channel_id);
+        int unsubscribeChannel(CURL *curl, int channel_id);
 
-    int receiveWebsocketData(CURL *curl, pollfd *socket);
+        int receiveWebsocketData(CURL *curl, pollfd *socket);
 
 };
