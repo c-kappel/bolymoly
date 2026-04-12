@@ -1,6 +1,7 @@
 src/kalshlib/config.txt
 
 .vscode/
+bot 
 
 *.out
 *.o

@@ -3,9 +3,6 @@
 #include <cstring>
 #include <chrono>
 #include <ctime>
-#include <poll.h>
-#include <openssl/pem.h>
-#include <openssl/evp.h>
 #include "kalshlib.h"
 
 ConnectionManager::ConnectionManager(){
@@ -18,7 +15,7 @@ ConnectionManager::ConnectionManager(){
     pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
     ctx =  EVP_PKEY_CTX_new(pkey, NULL);
     baseUrl = "https://api.elections.kalshi.com";//"https://demo-api.kalshi.co";
-    orderbookMsg = (char*)malloc(4096);
+    orderbookMsg = (char*)malloc(16192);
 }
 
 std::string ConnectionManager::currentTimeMs(){
@@ -407,7 +404,7 @@ int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, char *data, size_t 
 int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
     CURLcode receive_msg = CURLE_OK;
     size_t r_offset = 0;
-    size_t data_size = 4096;
+    size_t data_size = 16192;
 
     while(1){
         const struct curl_ws_frame *meta;
@@ -431,12 +428,7 @@ int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
             std::cout << "The buffer was too small to intake the incoming frame" << std::endl;
             return -1; 
         }
-        if (meta->bytesleft == 0){
-            orderbookMsg[r_offset] = '\0';
-            r_offset = 0;
-            printf("Current frame: %s\n", orderbookMsg);
-            memset((void*)orderbookMsg, 0, data_size);
-        }
+        printf("%s", orderbookMsg);
     }
 }
 

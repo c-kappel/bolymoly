@@ -2,7 +2,7 @@
 struct PriceLevel {
     double price;
     int numContracts;
-}
+};
 
 class Orderbook {
     private:
@@ -10,8 +10,10 @@ class Orderbook {
     public: 
         Orderbook();
 
+        void parseSnapshot(char *orderbookBuffer, int position);
+
         void updateOrderbook(PriceLevel level);
 
         PriceLevel readCurrentPrice();
 
-}
+};

@@ -1,6 +1,9 @@
 #include <string>
 #include <vector>
 #include <curl/curl.h>
+#include <openssl/pem.h>
+#include <openssl/evp.h>
+#include <poll.h>
 
 class ConnectionManager{
     private:
