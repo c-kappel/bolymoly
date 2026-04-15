@@ -1,3 +1,6 @@
+#ifndef KALSHLIB_H
+#define KALSHLIB_H
+
 #include <string>
 #include <vector>
 #include <curl/curl.h>
@@ -42,3 +45,5 @@ class ConnectionManager{
         int receiveWebsocketData(CURL *curl, pollfd *socket);
 
 };
+
+#endif

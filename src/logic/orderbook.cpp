@@ -4,14 +4,14 @@
 
 Orderbook::Orderbook(){
     for (int i = 0; i < 10000; ++i){
-        PriceLevel p = {i/10, 0};
+        PriceLevel p{double(i/10), 0};
         levels[i] = p;
     }
 }
 
 /*
-Parses the buffer from 
+Parses the buffer from the websocket, 
 */
-Orderbook::parseSnapshot(char *orderbookBuffer, int bufferPosition){
-
+void Orderbook::parseSnapshot(char *orderbookBuffer, int bufferPosition){
+ 
 }

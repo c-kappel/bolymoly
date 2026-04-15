@@ -1,3 +1,5 @@
+#ifndef ORDERBOOK_H
+#define ORDERBOOK_H
 
 struct PriceLevel {
     double price;
@@ -17,3 +19,4 @@ class Orderbook {
         PriceLevel readCurrentPrice();
 
 };
+#endif
