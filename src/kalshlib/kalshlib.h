@@ -10,6 +10,7 @@
 
 class ConnectionManager{
     private:
+        size_t r_offset;
         int ws_sub_id;
         char ticker[24];
         std::string publicKey;

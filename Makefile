@@ -11,11 +11,14 @@ all: bot
 clean:
 	rm -rf src/kalshlib/*.o src/logic/*.o bot 
 
-bot: src/kalshlib/kalshlib.o src/logic/orderbook.o src/kalshlib/kalshlib.h
-	$(CPPC) $(CFLAGS) $< $(OPENSSL_LF) $(CURL_LF) -o $@
+bot: src/kalshlib/kalshlib.o src/logic/orderbook.o src/logic/main.o
+	$(CPPC) $(CFLAGS) $^ $(OPENSSL_LF) $(CURL_LF) -o $@
 
 src/kalshlib/kalshlib.o: src/kalshlib/kalshlib.cpp src/kalshlib/kalshlib.h
 	$(CPPC) $(CFLAGS) $(OPENSSL_CF) $(CURL_CF) -c $< -o $@
 
 src/logic/orderbook.o: src/logic/orderbook.cpp src/kalshlib/kalshlib.h src/logic/orderbook.h
 	$(CPPC) $(CFLAGS) $(OPENSSL_CF) -c $< -o $@
+
+src/logic/main.o: src/logic/main.cpp src/logic/orderbook.h
+	$(CPPC) $(CFLAGS) -c $< -o $@

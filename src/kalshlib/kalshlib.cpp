@@ -15,7 +15,8 @@ ConnectionManager::ConnectionManager(){
     pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
     ctx =  EVP_PKEY_CTX_new(pkey, NULL);
     baseUrl = "https://api.elections.kalshi.com";//"https://demo-api.kalshi.co";
-    orderbookMsg = (char*)malloc(16192);
+    orderbookMsg = (char*)malloc(1000000);
+    r_offset = 0;
 }
 
 std::string ConnectionManager::currentTimeMs(){
@@ -403,8 +404,7 @@ int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, char *data, size_t 
 
 int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
     CURLcode receive_msg = CURLE_OK;
-    size_t r_offset = 0;
-    size_t data_size = 16192;
+    size_t data_size = 1000000;
 
     while(1){
         const struct curl_ws_frame *meta;

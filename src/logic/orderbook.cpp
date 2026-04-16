@@ -1,10 +1,9 @@
-#include <iostream>
 #include "../kalshlib/kalshlib.h"
 #include "orderbook.h"
 
 Orderbook::Orderbook(){
     for (int i = 0; i < 10000; ++i){
-        PriceLevel p{double(i/10), 0};
+        PriceLevel p{double(i) / 10, 0};
         levels[i] = p;
     }
 }
@@ -12,6 +11,6 @@ Orderbook::Orderbook(){
 /*
 Parses the buffer from the websocket, 
 */
-void Orderbook::parseSnapshot(char *orderbookBuffer, int bufferPosition){
- 
+void Orderbook::parseSnapshot(char *orderbookBuffer, size_t bufferPosition){
+    
 }
