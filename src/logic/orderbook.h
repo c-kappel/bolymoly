@@ -3,22 +3,18 @@
 
 #include <iostream>
 
-struct PriceLevel {
-    double price;
-    int numContracts;
-};
-
 class Orderbook {
     public:
-        PriceLevel levels[10000];
+        float up[10000];
+        float down[10000];
  
-        Orderbook();
+        Orderbook() ;
 
         void parseSnapshot(char *orderbookBuffer, size_t position);
 
-        void updateOrderbook(PriceLevel level);
+        void updateOrderbook(double level);
 
-        PriceLevel readCurrentPrice();
+        void readCurrentPrice();
 
 };
 #endif

@@ -21,4 +21,7 @@ src/logic/orderbook.o: src/logic/orderbook.cpp src/kalshlib/kalshlib.h src/logic
 	$(CPPC) $(CFLAGS) $(OPENSSL_CF) -c $< -o $@
 
 src/logic/main.o: src/logic/main.cpp src/logic/orderbook.h
+	$(CPPC) $(CFLAGS) $(OPENSSL_CF) -c $< -o $@
+
+src/simdjson/simdjson.o: src/simdjson/simdjson.cpp src/simdjson/simdjson.cpp 
 	$(CPPC) $(CFLAGS) -c $< -o $@

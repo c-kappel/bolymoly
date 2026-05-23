@@ -15,7 +15,7 @@ ConnectionManager::ConnectionManager(){
     pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
     ctx =  EVP_PKEY_CTX_new(pkey, NULL);
     baseUrl = "https://api.elections.kalshi.com";//"https://demo-api.kalshi.co";
-    orderbookMsg = (char*)malloc(1000000);
+    orderbookMsg = (char*)malloc(BUFFER_SIZE);
     r_offset = 0;
 }
 
@@ -402,14 +402,14 @@ int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, char *data, size_t 
     return -1;
 }
 
-int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
+int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket, std::atomic<unsigned> &count){
     CURLcode receive_msg = CURLE_OK;
-    size_t data_size = 1000000;
 
     while(1){
+        while(count.load() == BUFFER_SIZE / 512); //busy waiting when buffer is full
         const struct curl_ws_frame *meta;
         size_t recv = 0;
-        receive_msg = curl_ws_recv(curl, r_offset + orderbookMsg, data_size - r_offset, &recv, &meta);
+        receive_msg = curl_ws_recv(curl, r_offset + orderbookMsg, BUFFER_SIZE - r_offset, &recv, &meta);
        
         if (receive_msg == CURLE_AGAIN){
             int wait = poll(socket, 1, 10000);
@@ -419,36 +419,24 @@ int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket){
             }
             continue;
         }
-        r_offset += recv;
+
         if (receive_msg != 0){
             std::cout << "Error msg: " << receive_msg << std::endl;
             return -1;
         }
-        if (meta->bytesleft > data_size - r_offset){
+        if (meta->bytesleft > BUFFER_SIZE - r_offset){
             std::cout << "The buffer was too small to intake the incoming frame" << std::endl;
             return -1; 
         }
-        printf("%s", orderbookMsg);
+
+        if (recv < 512) { // orderbook update
+            r_offset += 512;
+            count.fetch_add(1, std::memory_order_relaxed);
+        }
+        else { // orderbook snapshot
+            r_offset += 2048;
+            count.fetch_add(4, std::memory_order_relaxed);
+        }
+        r_offset %= BUFFER_SIZE;
     }
 }
-
-int main(){
-    ConnectionManager manager;
-
-    CURL* curl = curl_easy_init();
-    manager.createWebsocket(curl);
-    char data[512];
-    int result = manager.subscribeOrderbookUpdates(curl, data, 512);
-   
-    curl_socket_t socketfd;
-    CURLcode get_fd = curl_easy_getinfo(curl, CURLINFO_ACTIVESOCKET, &socketfd);
-    struct pollfd socket;
-    socket.fd = socketfd;
-    socket.events = POLLIN;
-    socket.revents = 0;
-    manager.receiveWebsocketData(curl, &socket);
-
-    curl_easy_cleanup(curl);
-    return 0;
-}
-

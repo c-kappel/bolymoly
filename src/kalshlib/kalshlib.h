@@ -7,6 +7,9 @@
 #include <openssl/pem.h>
 #include <openssl/evp.h>
 #include <poll.h>
+#include <atomic>
+
+#define BUFFER_SIZE 4096
 
 class ConnectionManager{
     private:
@@ -43,7 +46,7 @@ class ConnectionManager{
 
         int unsubscribeChannel(CURL *curl, int channel_id);
 
-        int receiveWebsocketData(CURL *curl, pollfd *socket);
+        int receiveWebsocketData(CURL *curl, pollfd *socket, std::atomic<unsigned> &count);
 
 };
 
