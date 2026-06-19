@@ -5,18 +5,17 @@
 #include <ctime>
 #include "kalshlib.h"
 
-ConnectionManager::ConnectionManager(){
+ConnectionManager::ConnectionManager(const char *ticker){
     //Set public key and stage the private key
     ws_sub_id = 0;
-    std::string market = "KXSOL15M";
-    updateMarketTicker(ticker, market);
+    std::string market = ticker == nullptr ? "" : ticker;
+    updateMarketTicker(this->ticker, market);
     publicKey = "e86478f2-dd6c-4ae9-9190-064f670aad90";
     FILE* fp = fopen("src/kalshlib/config.txt", "r");
     pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
     ctx =  EVP_PKEY_CTX_new(pkey, NULL);
-    baseUrl = "https://api.elections.kalshi.com";//"https://demo-api.kalshi.co";
+    baseUrl = "https://api.elections.kalshi.com";
     orderbookMsg = (char*)malloc(BUFFER_SIZE);
-    r_offset = 0;
 }
 
 std::string ConnectionManager::currentTimeMs(){
@@ -67,6 +66,7 @@ std::string ConnectionManager::signMsg(std::string &text, EVP_PKEY* pkey){
 
     return result;
 }
+
 struct ResponseData {
     char *data;
     size_t size;
@@ -86,7 +86,6 @@ static size_t write_callback(char *payload, size_t size, size_t nmemb, void *use
     response->data[response->size] = '\0';
     return realSize;
 }
-
 
 void parseJSON(char *input, const char* key, char delim, char *c_out, int *d_out){
     char *start = strstr(input, key);
@@ -161,6 +160,7 @@ int ConnectionManager::getBalance(){
     return balance;
 }
 
+// 1 is buy, 1 is yes
 std::string ConnectionManager::placeOrder(int action, int side, int price, int numContracts){
     std::string method = "POST";
     std::string path = "/trade-api/v2/portfolio/orders";
@@ -249,6 +249,11 @@ int ConnectionManager::cancelOrder(std::string &orderId){
 }
 
 int ConnectionManager::createWebsocket(CURL *curl){
+    if (curl == nullptr) {
+        std::cout << "Error creating the websocket connection: curl init failed" << std::endl;
+        return 0;
+    }
+
     std::string method = "GET";
     std::string path = "/trade-api/ws/v2";
     curl_slist *list = NULL;
@@ -258,11 +263,18 @@ int ConnectionManager::createWebsocket(CURL *curl){
     curl_easy_setopt(curl, CURLOPT_URL, "wss://api.elections.kalshi.com/trade-api/ws/v2");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
     curl_easy_setopt(curl, CURLOPT_CONNECT_ONLY, 2L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 5000L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 15000L);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+
     CURLcode result = curl_easy_perform(curl);
+    curl_slist_free_all(list);
+
     if (result) {
         std::cout << "Error creating the websocket connection: " << curl_easy_strerror(result) << std::endl;
         return 0;
     }
+    std::cout << "Created websocket connection" << std::endl;
     return 1;
 }
 
@@ -391,6 +403,7 @@ int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, char *data, size_t 
         }
         if (receive_msg == CURLE_OK){
             if (meta->bytesleft == 0){
+                std::cout << "Connected to orderbook updates" << std::endl;
                 return this->ws_sub_id;
             }
             if (meta->bytesleft > data_size - r_offset){
@@ -404,31 +417,29 @@ int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, char *data, size_t 
 
 int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket, std::atomic<unsigned> &count){
     CURLcode receive_msg = CURLE_OK;
-
+    size_t r_offset = 0;
     while(1){
         while(count.load() == BUFFER_SIZE / 512); //busy waiting when buffer is full
         const struct curl_ws_frame *meta;
         size_t recv = 0;
         receive_msg = curl_ws_recv(curl, r_offset + orderbookMsg, BUFFER_SIZE - r_offset, &recv, &meta);
-       
         if (receive_msg == CURLE_AGAIN){
             int wait = poll(socket, 1, 10000);
             if (wait == 0){ //no data for more 10s
-                std::cout << "Dead socket!" << std::endl;
+                std::cout << "No data from websocket connection" << std::endl;
                 return -2;
             }
             continue;
         }
-
         if (receive_msg != 0){
-            std::cout << "Error msg: " << receive_msg << std::endl;
+            std::cout << "Error msg: " << receive_msg
+                      << " (" << curl_easy_strerror(receive_msg) << ")" << std::endl;
             return -1;
         }
         if (meta->bytesleft > BUFFER_SIZE - r_offset){
             std::cout << "The buffer was too small to intake the incoming frame" << std::endl;
             return -1; 
         }
-
         if (recv < 512) { // orderbook update
             r_offset += 512;
             count.fetch_add(1, std::memory_order_relaxed);

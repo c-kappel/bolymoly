@@ -13,16 +13,15 @@
 
 class ConnectionManager{
     private:
-        size_t r_offset;
         int ws_sub_id;
-        char ticker[24];
+        char ticker[64];
         std::string publicKey;
         EVP_PKEY* pkey;
         EVP_PKEY_CTX* ctx;
         std::string baseUrl;
         char *orderbookMsg;
     public:
-        ConnectionManager();
+        ConnectionManager(const char *ticker);
         
         std::string currentTimeMs();
         

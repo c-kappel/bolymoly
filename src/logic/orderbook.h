@@ -8,9 +8,9 @@ class Orderbook {
         float up[10000];
         float down[10000];
  
-        Orderbook() ;
+        Orderbook();
 
-        void parseSnapshot(char *orderbookBuffer, size_t position);
+        void parseSnapshot(char *orderbookBuffer, size_t position, std::atomic<unsigned> count);
 
         void updateOrderbook(double level);
 

@@ -6,3 +6,6 @@ bot
 *.out
 *.o
 *.txt
+
+#scripts
+venv
