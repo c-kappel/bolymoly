@@ -10,6 +10,7 @@
 #include <atomic>
 
 #define BUFFER_SIZE 4096
+#define INDEX_SIZE  512 
 
 class ConnectionManager{
     private:
@@ -19,7 +20,6 @@ class ConnectionManager{
         EVP_PKEY* pkey;
         EVP_PKEY_CTX* ctx;
         std::string baseUrl;
-        char *orderbookMsg;
     public:
         ConnectionManager(const char *ticker);
         
@@ -45,7 +45,7 @@ class ConnectionManager{
 
         int unsubscribeChannel(CURL *curl, int channel_id);
 
-        int receiveWebsocketData(CURL *curl, pollfd *socket, std::atomic<unsigned> &count);
+        int receiveWebsocketData(char* orderbookMsg, CURL *curl, pollfd *socket, std::atomic<unsigned> &producer, bool &snapshot_f);
 
 };
 

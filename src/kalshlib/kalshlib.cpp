@@ -15,7 +15,6 @@ ConnectionManager::ConnectionManager(const char *ticker){
     pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
     ctx =  EVP_PKEY_CTX_new(pkey, NULL);
     baseUrl = "https://api.elections.kalshi.com";
-    orderbookMsg = (char*)malloc(BUFFER_SIZE);
 }
 
 std::string ConnectionManager::currentTimeMs(){
@@ -415,11 +414,11 @@ int ConnectionManager::subscribeOrderbookUpdates(CURL *curl, char *data, size_t 
     return -1;
 }
 
-int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket, std::atomic<unsigned> &count){
+int ConnectionManager::receiveWebsocketData(char* orderbookMsg, CURL* curl, pollfd *socket, std::atomic<unsigned> &count, bool &snapshot_f){
     CURLcode receive_msg = CURLE_OK;
     size_t r_offset = 0;
     while(1){
-        while(count.load() == BUFFER_SIZE / 512); //busy waiting when buffer is full
+        while(count.load() == BUFFER_SIZE / INDEX_SIZE); //busy waiting when buffer is full
         const struct curl_ws_frame *meta;
         size_t recv = 0;
         receive_msg = curl_ws_recv(curl, r_offset + orderbookMsg, BUFFER_SIZE - r_offset, &recv, &meta);
@@ -445,6 +444,7 @@ int ConnectionManager::receiveWebsocketData(CURL* curl, pollfd *socket, std::ato
             count.fetch_add(1, std::memory_order_relaxed);
         }
         else { // orderbook snapshot
+            snapshot_f = true;
             r_offset += 2048;
             count.fetch_add(4, std::memory_order_relaxed);
         }
