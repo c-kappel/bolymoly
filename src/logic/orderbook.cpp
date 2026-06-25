@@ -270,7 +270,7 @@ void Orderbook::readCurrentPrice() {
 }
 
 void Orderbook::printBook() {
-    for (int i = 0; i < std::size(this->yes_fp) / 2; i+=100) {
+    for (int i = 0; i < std::size(this->yes_fp); i+=100) {
         std::cout << "Level: " << i / 10000.0f << " " << "Amount: " << yes_fp[i] << std::endl;
     }
 }
